@@ -1,0 +1,364 @@
+<style>
+  body { margin: 0; background: #17212b; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; overflow: hidden; height: 100vh; justify-content: center; }
+  #board { display: grid; grid-template-columns: repeat(10, 20px); grid-template-rows: repeat(20, 20px); gap: 1px; background: #232e3c; padding: 2px; margin-top: 10px; }
+  .cell { width: 20px; height: 20px; background: #0e1621; }
+  .block { background: #007bff; }
+  .controls { margin-top: 15px; display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; width: 220px; }
+  button { padding: 10px; font-size: 1.2em; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; flex: 1 1 40%; }
+  
+  /* Оверлеи */
+  #rules-overlay, #game-over-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(23, 33, 43, 0.98); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; text-align: center; }
+  #game-over-overlay { display: none; }
+  h2, h3 { color: #007bff; margin: 10px 0; }
+  .overlay-btn { margin-top: 20px; padding: 10px 30px; width: 100%; max-width: 200px; }
+
+  /* Красивый заголовок TETRIS */
+  .title-logo { font-size: 42px; font-weight: 900; letter-spacing: 4px; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+  .title-logo span { display: inline-block; }
+  .letter-T { color: #00f0f0; }
+  .letter-E { color: #f0f000; }
+  .letter-T2 { color: #a000f0; }
+  .letter-R { color: #00f000; }
+  .letter-I { color: #f00000; }
+  .letter-S { color: #0000f0; }
+
+  #collector-panel { display: flex; justify-content: center; gap: 10px; margin-top: 5px; font-size: 14px; }
+  .collector-item { display: flex; align-items: center; gap: 3px; }
+  .color-box { width: 12px; height: 12px; border-radius: 2px; }
+
+  #score-display { margin-top: 5px; font-size: 1.1em; color: #fff; display: flex; gap: 15px; }
+  .stat { color: #007bff; font-weight: bold; }
+</style>
+
+<!-- Экран правил -->
+<div id="rules-overlay">
+  <div class="title-logo">
+    <span class="letter-T">Т</span><span class="letter-E">Е</span><span class="letter-T2">Т</span><span class="letter-R">Р</span><span class="letter-I">И</span><span class="letter-S">С</span>
+  </div>
+  
+  <!-- Счетчик игроков на экране правил -->
+  <div style="background: rgba(0,123,255,0.2); padding: 5px 15px; border-radius: 10px; margin-bottom: 15px; font-size: 14px;">
+    👥 В игру играли: <span id="rules-players" style="font-weight: bold; color: #00f0f0;">0</span> чел.
+  </div>
+
+  <p style="font-size: 15px; line-height: 1.6; max-width: 300px;">
+    <b>Цель игры:</b><br>
+    1. Собирайте линии для очков.<br>
+    2. Ищите <b>квадраты 3x3</b> одинакового цвета.<br>
+    3. Собирайте по 3 квадрата каждого цвета!
+  </p>
+  <button class="overlay-btn" id="start-game">Понятно, играем!</button>
+</div>
+
+<!-- Экран Game Over -->
+<div id="game-over-overlay">
+  <h2>Игра окончена!</h2>
+  <p style="font-size: 18px;">Ваш результат: <span id="final-score">0</span> очков</p>
+  <p style="font-size: 14px; color: #888;">Собрано квадратов:</p>
+  <div id="final-collector" style="display: flex; gap: 10px; justify-content: center; margin-bottom: 10px;"></div>
+  <button class="overlay-btn" id="restart-game">Попробовать ещё раз</button>
+</div>
+
+<div id="score-display">
+  <span>Очки: <span id="score">0</span></span>
+  <!-- Счетчик игроков в панели -->
+  <span class="stat">👥 <span id="total-players">0</span></span>
+</div>
+
+<div id="collector-panel">
+  <div class="collector-item"><div class="color-box" style="background:#00f0f0"></div><span id="cnt-0">0</span></div>
+  <div class="collector-item"><div class="color-box" style="background:#f0f000"></div><span id="cnt-1">0</span></div>
+  <div class="collector-item"><div class="color-box" style="background:#a000f0"></div><span id="cnt-2">0</span></div>
+  <div class="collector-item"><div class="color-box" style="background:#00f000"></div><span id="cnt-3">0</span></div>
+  <div class="collector-item"><div class="color-box" style="background:#f00000"></div><span id="cnt-4">0</span></div>
+  <div class="collector-item"><div class="color-box" style="background:#0000f0"></div><span id="cnt-5">0</span></div>
+  <div class="collector-item"><div class="color-box" style="background:#f0a000"></div><span id="cnt-6">0</span></div>
+</div>
+<div id="board"></div>
+<div class="controls">
+  <button id="left">←</button>
+  <button id="right">→</button>
+  <button id="rotate">↻</button>
+  <button id="hard-drop">Вниз ↓</button>
+</div>
+
+<script>
+  try {
+    const boardEl = document.getElementById('board');
+    
+    // Читаем данные от бота (включая totalPlayers)
+    const W = window.TelegramWidget;
+    const gameState = JSON.parse(W.chatData || '{"locked":[], "score":0, "totalPlayers":0}');
+    
+    let lockedCells = gameState.locked || [];
+    let score = gameState.score || 0;
+    let totalPlayers = gameState.totalPlayers || 0; // Счетчик игроков
+    let fallSpeed = 1;
+    let squaresCollected = [0,0,0,0,0,0,0];
+    let gameActive = false;
+    let figure = null;
+    let intervalId = null;
+    let lastPieceIndex = -1;
+
+    // Выводим счетчик игроков
+    document.getElementById('rules-players').textContent = totalPlayers;
+    document.getElementById('total-players').textContent = totalPlayers;
+
+    const PIECES = [
+      { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#00f0f0' },
+      { shape: [[1,1],[1,1]], color: '#f0f000' },
+      { shape: [[0,1,0],[1,1,1],[0,0,0]], color: '#a000f0' },
+      { shape: [[0,1,1],[1,1,0],[0,0,0]], color: '#00f000' },
+      { shape: [[1,1,0],[0,1,1],[0,0,0]], color: '#f00000' },
+      { shape: [[1,0,0],[1,1,1],[0,0,0]], color: '#0000f0' },
+      { shape: [[0,0,1],[1,1,1],[0,0,0]], color: '#f0a000' }
+    ];
+
+    const cells = [];
+    for (let y = 0; y < 20; y++) {
+      for (let x = 0; x < 10; x++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.id = `cell-${x}-${y}`;
+        boardEl.appendChild(cell);
+        cells.push({ x, y, el: cell });
+      }
+    }
+
+    function startTimer() {
+      if (intervalId) clearInterval(intervalId);
+      const interval = Math.max(100, 1000 / fallSpeed);
+      intervalId = setInterval(moveDown, interval);
+    }
+
+    function spawnFigure() {
+      if (!gameActive) return;
+      
+      let pieceIndex;
+      do { pieceIndex = Math.floor(Math.random() * PIECES.length); } while (pieceIndex === lastPieceIndex && PIECES.length > 1);
+      lastPieceIndex = pieceIndex;
+      const piece = PIECES[pieceIndex];
+      
+      figure = { x: 3, y: 0, shape: piece.shape, color: piece.color, colorIndex: pieceIndex };
+      
+      if (checkCollision(figure.x, figure.y, figure.shape)) {
+        endGame();
+        return;
+      }
+      draw();
+      startTimer();
+    }
+
+    function checkCollision(px, py, shape) {
+      for (let r = 0; r < shape.length; r++) {
+        for (let c = 0; c < shape[r].length; c++) {
+          if (shape[r][c]) {
+            const x = px + c, y = py + r;
+            if (x < 0 || x >= 10 || y >= 20) return true;
+            if (lockedCells.some(b => b.x === x && b.y === y)) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function draw() {
+      cells.forEach(c => { c.el.className = 'cell'; c.el.style.backgroundColor = ''; });
+      
+      lockedCells.forEach(b => {
+        const el = document.getElementById(`cell-${b.x}-${b.y}`);
+        if (el) {
+          el.className = 'cell block';
+          el.style.backgroundColor = PIECES[b.colorIndex].color;
+        }
+      });
+      
+      if (figure) {
+        for (let r = 0; r < figure.shape.length; r++) {
+          for (let c = 0; c < figure.shape[r].length; c++) {
+            if (figure.shape[r][c]) {
+              const el = document.getElementById(`cell-${figure.x + c}-${figure.y + r}`);
+              if (el) {
+                el.className = 'cell block';
+                el.style.backgroundColor = figure.color;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    function moveDown() {
+      if (!figure || !gameActive) return;
+      if (!checkCollision(figure.x, figure.y + 1, figure.shape)) {
+        figure.y++; draw();
+      } else {
+        lockFigure();
+      }
+    }
+
+    function applyGravity() {
+      let moved = false;
+      for (let y = 18; y >= 0; y--) {
+        for (let x = 0; x < 10; x++) {
+          const blockIndex = lockedCells.findIndex(b => b.x === x && b.y === y);
+          if (blockIndex !== -1) {
+            if (!lockedCells.some(b => b.x === x && b.y === y + 1)) {
+              lockedCells[blockIndex].y += 1;
+              moved = true;
+            }
+          }
+        }
+      }
+      return moved;
+    }
+
+    function check3x3Squares() {
+      for (let y = 0; y <= 17; y++) {
+        for (let x = 0; x <= 7; x++) {
+          let firstColor = null;
+          let isSquare = true;
+          
+          for (let dy = 0; dy < 3; dy++) {
+            for (let dx = 0; dx < 3; dx++) {
+              const cell = lockedCells.find(b => b.x === x + dx && b.y === y + dy);
+              if (!cell) { isSquare = false; break; }
+              if (firstColor === null) firstColor = cell.colorIndex;
+              else if (cell.colorIndex !== firstColor) { isSquare = false; break; }
+            }
+            if (!isSquare) break;
+          }
+          
+          if (isSquare) {
+            squaresCollected[firstColor]++;
+            for (let dy = 0; dy < 3; dy++) {
+              for (let dx = 0; dx < 3; dx++) {
+                lockedCells = lockedCells.filter(b => !(b.x === x + dx && b.y === y + dy));
+              }
+            }
+            score += 500;
+            document.getElementById(`cnt-${firstColor}`).textContent = squaresCollected[firstColor];
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function lockFigure() {
+      if (!figure) return;
+      for (let r = 0; r < figure.shape.length; r++) {
+        for (let c = 0; c < figure.shape[r].length; c++) {
+          if (figure.shape[r][c]) {
+            lockedCells.push({ x: figure.x + c, y: figure.y + r, colorIndex: figure.colorIndex });
+          }
+        }
+      }
+      figure = null;
+      clearInterval(intervalId);
+
+      let fullLines = [];
+      for (let y = 19; y >= 0; y--) {
+        if (lockedCells.filter(b => b.y === y).length === 10) fullLines.push(y);
+      }
+
+      if (fullLines.length > 0) {
+        lockedCells = lockedCells.filter(b => !fullLines.includes(b.y));
+        fullLines.sort((a, b) => a - b).forEach(y => {
+          lockedCells = lockedCells.map(b => b.y < y ? { ...b, y: b.y + 1 } : b);
+        });
+        score += fullLines.length * fullLines.length * 100;
+        fallSpeed += 0.1;
+      }
+
+      let hasExploded = check3x3Squares();
+      while (hasExploded) {
+        applyGravity();
+        hasExploded = check3x3Squares();
+      }
+
+      document.getElementById('score').textContent = score;
+      draw();
+      setTimeout(() => { if (gameActive) spawnFigure(); }, 300);
+    }
+
+    function hardDrop() {
+      if (!figure || !gameActive) return;
+      clearInterval(intervalId); 
+      while (!checkCollision(figure.x, figure.y + 1, figure.shape)) figure.y++;
+      draw();
+      lockFigure();
+    }
+
+    function rotate() {
+      if (!figure || !gameActive) return;
+      const oldShape = figure.shape;
+      const size = oldShape.length;
+      const newShape = Array(size).fill().map(() => Array(size).fill(0));
+      
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          newShape[x][size - 1 - y] = oldShape[y][x];
+        }
+      }
+      
+      if (!checkCollision(figure.x, figure.y, newShape)) {
+        figure.shape = newShape;
+        draw();
+      }
+    }
+
+    function endGame() {
+      gameActive = false;
+      figure = null;
+      clearInterval(intervalId);
+      draw();
+      
+      document.getElementById('final-score').textContent = score;
+      
+      const collectorDiv = document.getElementById('final-collector');
+      collectorDiv.innerHTML = '';
+      for (let i = 0; i < 7; i++) {
+        if (squaresCollected[i] > 0) {
+          const item = document.createElement('div');
+          item.className = 'collector-item';
+          item.innerHTML = `<div class="color-box" style="background:${PIECES[i].color}"></div><span>${squaresCollected[i]}</span>`;
+          collectorDiv.appendChild(item);
+        }
+      }
+      
+      document.getElementById('game-over-overlay').style.display = 'flex';
+    }
+
+    function resetGame() {
+      lockedCells = [];
+      score = 0;
+      fallSpeed = 1;
+      squaresCollected = [0,0,0,0,0,0,0];
+      document.getElementById('score').textContent = '0';
+      for (let i = 0; i < 7; i++) document.getElementById(`cnt-${i}`).textContent = '0';
+      
+      document.getElementById('game-over-overlay').style.display = 'none';
+      document.getElementById('rules-overlay').style.display = 'none';
+      
+      gameActive = true;
+      spawnFigure();
+    }
+
+    document.getElementById('left').onclick = () => { if (figure && gameActive && !checkCollision(figure.x - 1, figure.y, figure.shape)) { figure.x--; draw(); } };
+    document.getElementById('right').onclick = () => { if (figure && gameActive && !checkCollision(figure.x + 1, figure.y, figure.shape)) { figure.x++; draw(); } };
+    document.getElementById('rotate').onclick = rotate;
+    document.getElementById('hard-drop').onclick = hardDrop;
+
+    document.getElementById('start-game').onclick = () => {
+      document.getElementById('rules-overlay').style.display = 'none';
+      gameActive = true;
+      spawnFigure();
+    };
+
+    document.getElementById('restart-game').onclick = resetGame;
+    
+  } catch (e) {
+    alert("Критическая ошибка: " + e.message);
+  }
+</script>

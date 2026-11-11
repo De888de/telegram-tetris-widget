@@ -1,0 +1,41 @@
+<div style="text-align: center; padding: 20px; font-family: sans-serif;">
+  <p style="font-size: 3em; margin: 0; color: #fff;" id="count">0</p>
+  <button id="increment" style="margin-top: 15px; padding: 10px 30px; font-size: 1.2em; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
+    +1
+  </button>
+</div>
+<script>
+  const W = window.TelegramWidget;
+  const output = document.getElementById('count');
+  const button = document.getElementById('increment');
+  
+  const draw = () => {
+    const state = JSON.parse(W.chatData || '{"count":0}');
+    output.textContent = String(state.count);
+  };
+  
+  W.onEvent('chatDataChanged', draw);
+  draw();
+  
+  button.onclick = () => {
+    // Блокируем кнопку на 1 секунду, чтобы не спамить запросами
+    button.disabled = true;
+    button.style.backgroundColor = '#555';
+    
+    W.request(${js(Increment.encode('next'))}).then(() => {
+      // Успешно — разблокируем через секунду
+      setTimeout(() => {
+        button.disabled = false;
+        button.style.backgroundColor = '#007bff';
+      }, 1000);
+    }).catch((err) => {
+      // Если ошибка (например, RATE_LIMITED) — показываем и тоже ждём
+      output.textContent = 'Ошибка: ' + err.code;
+      setTimeout(() => {
+        button.disabled = false;
+        button.style.backgroundColor = '#007bff';
+        draw(); // Возвращаем актуальное число
+      }, 1500);
+    });
+  };
+</script>
