@@ -1,364 +1,102 @@
 <style>
-  body { margin: 0; background: #17212b; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; overflow: hidden; height: 100vh; justify-content: center; }
-  #board { display: grid; grid-template-columns: repeat(10, 20px); grid-template-rows: repeat(20, 20px); gap: 1px; background: #232e3c; padding: 2px; margin-top: 10px; }
-  .cell { width: 20px; height: 20px; background: #0e1621; }
-  .block { background: #007bff; }
-  .controls { margin-top: 15px; display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; width: 220px; }
-  button { padding: 10px; font-size: 1.2em; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; flex: 1 1 40%; }
-  
-  /* Оверлеи */
-  #rules-overlay, #game-over-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(23, 33, 43, 0.98); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; text-align: center; }
-  #game-over-overlay { display: none; }
-  h2, h3 { color: #007bff; margin: 10px 0; }
-  .overlay-btn { margin-top: 20px; padding: 10px 30px; width: 100%; max-width: 200px; }
-
-  /* Красивый заголовок TETRIS */
-  .title-logo { font-size: 42px; font-weight: 900; letter-spacing: 4px; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-  .title-logo span { display: inline-block; }
-  .letter-T { color: #00f0f0; }
-  .letter-E { color: #f0f000; }
-  .letter-T2 { color: #a000f0; }
-  .letter-R { color: #00f000; }
-  .letter-I { color: #f00000; }
-  .letter-S { color: #0000f0; }
-
-  #collector-panel { display: flex; justify-content: center; gap: 10px; margin-top: 5px; font-size: 14px; }
-  .collector-item { display: flex; align-items: center; gap: 3px; }
-  .color-box { width: 12px; height: 12px; border-radius: 2px; }
-
-  #score-display { margin-top: 5px; font-size: 1.1em; color: #fff; display: flex; gap: 15px; }
-  .stat { color: #007bff; font-weight: bold; }
+  body{margin:0;background:#17212b;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;padding-bottom:20px}
+  #b{display:grid;grid-template-columns:repeat(10,20px);grid-template-rows:repeat(20,20px);gap:1px;background:#232e3c;padding:2px;margin-top:10px}
+  .c{width:20px;height:20px;background:#0e1621}
+  .blk{background:#007bff}
+  .ctrl{margin-top:15px;display:flex;gap:5px;flex-wrap:wrap;justify-content:center;width:220px}
+  button{padding:10px;font-size:1.2em;background:#007bff;color:#fff;border:none;border-radius:5px;cursor:pointer;flex:1 1 40%}
+  #r,#g,#l{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(23,33,43,.98);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:20px;text-align:center}
+  #g,#l{display:none}
+  h2,h3{color:#007bff;margin:10px 0}
+  .btn{margin-top:20px;padding:10px;width:200px;flex:none}
+  .logo{font-size:32px;font-weight:900;letter-spacing:4px;margin-bottom:15px;text-shadow:2px 2px 4px #000}
+  .logo span{display:inline-block}
+  .t{color:#00f0f0}.e{color:#f0f000}.t2{color:#a000f0}.r{color:#00f000}.i{color:#f00000}.s{color:#0000f0}
+  #c{display:flex;justify-content:center;gap:10px;margin-top:5px;font-size:14px;flex-wrap:wrap}
+  .ci{display:flex;align-items:center;gap:3px}
+  .cb{width:12px;height:12px;border-radius:2px}
+  .done{border:2px solid #fff;box-shadow:0 0 5px #fff}
+  #sc{margin-top:5px;font-size:1.1em;color:#fff;display:flex;gap:15px}
+  .st{color:#007bff;font-weight:bold}
+  .lb{background:#a000f0;padding:2px 8px;border-radius:10px;color:#fff;font-weight:bold}
+  .goal{font-size:14px;line-height:1.5;max-width:320px;text-align:left;margin:10px 0}
 </style>
 
-<!-- Экран правил -->
-<div id="rules-overlay">
-  <div class="title-logo">
-    <span class="letter-T">Т</span><span class="letter-E">Е</span><span class="letter-T2">Т</span><span class="letter-R">Р</span><span class="letter-I">И</span><span class="letter-S">С</span>
+<div id="r">
+  <div class="logo">
+    <span class="t">Т</span><span class="e">Е</span><span class="t2">Т</span><span class="r">Р</span><span class="i">И</span><span class="s">С</span>
   </div>
-  
-  <!-- Счетчик игроков на экране правил -->
-  <div style="background: rgba(0,123,255,0.2); padding: 5px 15px; border-radius: 10px; margin-bottom: 15px; font-size: 14px;">
-    👥 В игру играли: <span id="rules-players" style="font-weight: bold; color: #00f0f0;">0</span> чел.
+  <div style="background:rgba(0,123,255,.2);padding:5px 15px;border-radius:10px;margin-bottom:15px;font-size:14px">
+    👥 Игроков: <span id="rp" style="font-weight:bold;color:#00f0f0">0</span>
   </div>
-
-  <p style="font-size: 15px; line-height: 1.6; max-width: 300px;">
-    <b>Цель игры:</b><br>
-    1. Собирайте линии для очков.<br>
-    2. Ищите <b>квадраты 3x3</b> одинакового цвета.<br>
-    3. Собирайте по 3 квадрата каждого цвета!
-  </p>
-  <button class="overlay-btn" id="start-game">Понятно, играем!</button>
+  <div class="goal">
+    <b>📜 ПРАВИЛА:</b><br>
+    1. Собирайте линии и квадраты 3x3.<br>
+    2. За линию одного цвета — двойные очки!<br>
+    3. Проходите 5 уровней.
+  </div>
+  <button class="btn" id="s1">Играть!</button>
 </div>
 
-<!-- Экран Game Over -->
-<div id="game-over-overlay">
+<div id="l">
+  <h2 id="lt" style="color:#00f0f0">Уровень 1</h2>
+  <div class="goal" id="lg">Соберите 3 зелёных квадрата</div>
+  <button class="btn" id="s2">Вперёд!</button>
+</div>
+
+<div id="g">
   <h2>Игра окончена!</h2>
-  <p style="font-size: 18px;">Ваш результат: <span id="final-score">0</span> очков</p>
-  <p style="font-size: 14px; color: #888;">Собрано квадратов:</p>
-  <div id="final-collector" style="display: flex; gap: 10px; justify-content: center; margin-bottom: 10px;"></div>
-  <button class="overlay-btn" id="restart-game">Попробовать ещё раз</button>
+  <p style="font-size:18px">Очки: <span id="fs">0</span></p>
+  <p style="font-size:16px;color:#a000f0" id="fl"></p>
+  <button class="btn" id="s3">Ещё раз</button>
 </div>
 
-<div id="score-display">
+<div id="sc">
+  <span class="lb">Ур: <span id="lvl">1</span>/5</span>
   <span>Очки: <span id="score">0</span></span>
-  <!-- Счетчик игроков в панели -->
-  <span class="stat">👥 <span id="total-players">0</span></span>
+  <span class="st">👥 <span id="tp">0</span></span>
 </div>
 
-<div id="collector-panel">
-  <div class="collector-item"><div class="color-box" style="background:#00f0f0"></div><span id="cnt-0">0</span></div>
-  <div class="collector-item"><div class="color-box" style="background:#f0f000"></div><span id="cnt-1">0</span></div>
-  <div class="collector-item"><div class="color-box" style="background:#a000f0"></div><span id="cnt-2">0</span></div>
-  <div class="collector-item"><div class="color-box" style="background:#00f000"></div><span id="cnt-3">0</span></div>
-  <div class="collector-item"><div class="color-box" style="background:#f00000"></div><span id="cnt-4">0</span></div>
-  <div class="collector-item"><div class="color-box" style="background:#0000f0"></div><span id="cnt-5">0</span></div>
-  <div class="collector-item"><div class="color-box" style="background:#f0a000"></div><span id="cnt-6">0</span></div>
+<div id="c">
+  <div class="ci"><div class="cb" id="b0" style="background:#00f0f0"></div><span id="n0">0</span></div>
+  <div class="ci"><div class="cb" id="b1" style="background:#f0f000"></div><span id="n1">0</span></div>
+  <div class="ci"><div class="cb" id="b2" style="background:#a000f0"></div><span id="n2">0</span></div>
+  <div class="ci"><div class="cb" id="b3" style="background:#00f000"></div><span id="n3">0</span></div>
+  <div class="ci"><div class="cb" id="b4" style="background:#f00000"></div><span id="n4">0</span></div>
 </div>
-<div id="board"></div>
-<div class="controls">
-  <button id="left">←</button>
-  <button id="right">→</button>
-  <button id="rotate">↻</button>
-  <button id="hard-drop">Вниз ↓</button>
+<div id="b"></div>
+<div class="ctrl">
+  <button id="left">←</button><button id="right">→</button><button id="rot">↻</button><button id="drop">↓</button>
 </div>
 
 <script>
-  try {
-    const boardEl = document.getElementById('board');
-    
-    // Читаем данные от бота (включая totalPlayers)
-    const W = window.TelegramWidget;
-    const gameState = JSON.parse(W.chatData || '{"locked":[], "score":0, "totalPlayers":0}');
-    
-    let lockedCells = gameState.locked || [];
-    let score = gameState.score || 0;
-    let totalPlayers = gameState.totalPlayers || 0; // Счетчик игроков
-    let fallSpeed = 1;
-    let squaresCollected = [0,0,0,0,0,0,0];
-    let gameActive = false;
-    let figure = null;
-    let intervalId = null;
-    let lastPieceIndex = -1;
-
-    // Выводим счетчик игроков
-    document.getElementById('rules-players').textContent = totalPlayers;
-    document.getElementById('total-players').textContent = totalPlayers;
-
-    const PIECES = [
-      { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#00f0f0' },
-      { shape: [[1,1],[1,1]], color: '#f0f000' },
-      { shape: [[0,1,0],[1,1,1],[0,0,0]], color: '#a000f0' },
-      { shape: [[0,1,1],[1,1,0],[0,0,0]], color: '#00f000' },
-      { shape: [[1,1,0],[0,1,1],[0,0,0]], color: '#f00000' },
-      { shape: [[1,0,0],[1,1,1],[0,0,0]], color: '#0000f0' },
-      { shape: [[0,0,1],[1,1,1],[0,0,0]], color: '#f0a000' }
-    ];
-
-    const cells = [];
-    for (let y = 0; y < 20; y++) {
-      for (let x = 0; x < 10; x++) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        cell.id = `cell-${x}-${y}`;
-        boardEl.appendChild(cell);
-        cells.push({ x, y, el: cell });
-      }
-    }
-
-    function startTimer() {
-      if (intervalId) clearInterval(intervalId);
-      const interval = Math.max(100, 1000 / fallSpeed);
-      intervalId = setInterval(moveDown, interval);
-    }
-
-    function spawnFigure() {
-      if (!gameActive) return;
-      
-      let pieceIndex;
-      do { pieceIndex = Math.floor(Math.random() * PIECES.length); } while (pieceIndex === lastPieceIndex && PIECES.length > 1);
-      lastPieceIndex = pieceIndex;
-      const piece = PIECES[pieceIndex];
-      
-      figure = { x: 3, y: 0, shape: piece.shape, color: piece.color, colorIndex: pieceIndex };
-      
-      if (checkCollision(figure.x, figure.y, figure.shape)) {
-        endGame();
-        return;
-      }
-      draw();
-      startTimer();
-    }
-
-    function checkCollision(px, py, shape) {
-      for (let r = 0; r < shape.length; r++) {
-        for (let c = 0; c < shape[r].length; c++) {
-          if (shape[r][c]) {
-            const x = px + c, y = py + r;
-            if (x < 0 || x >= 10 || y >= 20) return true;
-            if (lockedCells.some(b => b.x === x && b.y === y)) return true;
-          }
-        }
-      }
-      return false;
-    }
-
-    function draw() {
-      cells.forEach(c => { c.el.className = 'cell'; c.el.style.backgroundColor = ''; });
-      
-      lockedCells.forEach(b => {
-        const el = document.getElementById(`cell-${b.x}-${b.y}`);
-        if (el) {
-          el.className = 'cell block';
-          el.style.backgroundColor = PIECES[b.colorIndex].color;
-        }
-      });
-      
-      if (figure) {
-        for (let r = 0; r < figure.shape.length; r++) {
-          for (let c = 0; c < figure.shape[r].length; c++) {
-            if (figure.shape[r][c]) {
-              const el = document.getElementById(`cell-${figure.x + c}-${figure.y + r}`);
-              if (el) {
-                el.className = 'cell block';
-                el.style.backgroundColor = figure.color;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    function moveDown() {
-      if (!figure || !gameActive) return;
-      if (!checkCollision(figure.x, figure.y + 1, figure.shape)) {
-        figure.y++; draw();
-      } else {
-        lockFigure();
-      }
-    }
-
-    function applyGravity() {
-      let moved = false;
-      for (let y = 18; y >= 0; y--) {
-        for (let x = 0; x < 10; x++) {
-          const blockIndex = lockedCells.findIndex(b => b.x === x && b.y === y);
-          if (blockIndex !== -1) {
-            if (!lockedCells.some(b => b.x === x && b.y === y + 1)) {
-              lockedCells[blockIndex].y += 1;
-              moved = true;
-            }
-          }
-        }
-      }
-      return moved;
-    }
-
-    function check3x3Squares() {
-      for (let y = 0; y <= 17; y++) {
-        for (let x = 0; x <= 7; x++) {
-          let firstColor = null;
-          let isSquare = true;
-          
-          for (let dy = 0; dy < 3; dy++) {
-            for (let dx = 0; dx < 3; dx++) {
-              const cell = lockedCells.find(b => b.x === x + dx && b.y === y + dy);
-              if (!cell) { isSquare = false; break; }
-              if (firstColor === null) firstColor = cell.colorIndex;
-              else if (cell.colorIndex !== firstColor) { isSquare = false; break; }
-            }
-            if (!isSquare) break;
-          }
-          
-          if (isSquare) {
-            squaresCollected[firstColor]++;
-            for (let dy = 0; dy < 3; dy++) {
-              for (let dx = 0; dx < 3; dx++) {
-                lockedCells = lockedCells.filter(b => !(b.x === x + dx && b.y === y + dy));
-              }
-            }
-            score += 500;
-            document.getElementById(`cnt-${firstColor}`).textContent = squaresCollected[firstColor];
-            return true;
-          }
-        }
-      }
-      return false;
-    }
-
-    function lockFigure() {
-      if (!figure) return;
-      for (let r = 0; r < figure.shape.length; r++) {
-        for (let c = 0; c < figure.shape[r].length; c++) {
-          if (figure.shape[r][c]) {
-            lockedCells.push({ x: figure.x + c, y: figure.y + r, colorIndex: figure.colorIndex });
-          }
-        }
-      }
-      figure = null;
-      clearInterval(intervalId);
-
-      let fullLines = [];
-      for (let y = 19; y >= 0; y--) {
-        if (lockedCells.filter(b => b.y === y).length === 10) fullLines.push(y);
-      }
-
-      if (fullLines.length > 0) {
-        lockedCells = lockedCells.filter(b => !fullLines.includes(b.y));
-        fullLines.sort((a, b) => a - b).forEach(y => {
-          lockedCells = lockedCells.map(b => b.y < y ? { ...b, y: b.y + 1 } : b);
-        });
-        score += fullLines.length * fullLines.length * 100;
-        fallSpeed += 0.1;
-      }
-
-      let hasExploded = check3x3Squares();
-      while (hasExploded) {
-        applyGravity();
-        hasExploded = check3x3Squares();
-      }
-
-      document.getElementById('score').textContent = score;
-      draw();
-      setTimeout(() => { if (gameActive) spawnFigure(); }, 300);
-    }
-
-    function hardDrop() {
-      if (!figure || !gameActive) return;
-      clearInterval(intervalId); 
-      while (!checkCollision(figure.x, figure.y + 1, figure.shape)) figure.y++;
-      draw();
-      lockFigure();
-    }
-
-    function rotate() {
-      if (!figure || !gameActive) return;
-      const oldShape = figure.shape;
-      const size = oldShape.length;
-      const newShape = Array(size).fill().map(() => Array(size).fill(0));
-      
-      for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-          newShape[x][size - 1 - y] = oldShape[y][x];
-        }
-      }
-      
-      if (!checkCollision(figure.x, figure.y, newShape)) {
-        figure.shape = newShape;
-        draw();
-      }
-    }
-
-    function endGame() {
-      gameActive = false;
-      figure = null;
-      clearInterval(intervalId);
-      draw();
-      
-      document.getElementById('final-score').textContent = score;
-      
-      const collectorDiv = document.getElementById('final-collector');
-      collectorDiv.innerHTML = '';
-      for (let i = 0; i < 7; i++) {
-        if (squaresCollected[i] > 0) {
-          const item = document.createElement('div');
-          item.className = 'collector-item';
-          item.innerHTML = `<div class="color-box" style="background:${PIECES[i].color}"></div><span>${squaresCollected[i]}</span>`;
-          collectorDiv.appendChild(item);
-        }
-      }
-      
-      document.getElementById('game-over-overlay').style.display = 'flex';
-    }
-
-    function resetGame() {
-      lockedCells = [];
-      score = 0;
-      fallSpeed = 1;
-      squaresCollected = [0,0,0,0,0,0,0];
-      document.getElementById('score').textContent = '0';
-      for (let i = 0; i < 7; i++) document.getElementById(`cnt-${i}`).textContent = '0';
-      
-      document.getElementById('game-over-overlay').style.display = 'none';
-      document.getElementById('rules-overlay').style.display = 'none';
-      
-      gameActive = true;
-      spawnFigure();
-    }
-
-    document.getElementById('left').onclick = () => { if (figure && gameActive && !checkCollision(figure.x - 1, figure.y, figure.shape)) { figure.x--; draw(); } };
-    document.getElementById('right').onclick = () => { if (figure && gameActive && !checkCollision(figure.x + 1, figure.y, figure.shape)) { figure.x++; draw(); } };
-    document.getElementById('rotate').onclick = rotate;
-    document.getElementById('hard-drop').onclick = hardDrop;
-
-    document.getElementById('start-game').onclick = () => {
-      document.getElementById('rules-overlay').style.display = 'none';
-      gameActive = true;
-      spawnFigure();
-    };
-
-    document.getElementById('restart-game').onclick = resetGame;
-    
-  } catch (e) {
-    alert("Критическая ошибка: " + e.message);
-  }
+try{
+const B=document.getElementById('b'),W=window.TelegramWidget,S=JSON.parse(W.chatData||'{"l":[],"s":0,"t":0}');
+let L=S.l||[],SC=S.s||0,TP=S.t||0,SP=1,LV=1,SQ=[0,0,0,0,0],A=false,F=null,I=null,PI=-1;
+document.getElementById('rp').textContent=TP;document.getElementById('tp').textContent=TP;
+const C=['#00f0f0','#f0f000','#a000f0','#00f000','#f00000'];
+const P=[[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],[[1,1],[1,1]],[[0,1,0],[1,1,1],[0,0,0]],[[0,1,1],[1,1,0],[0,0,0]],[[1,1,0],[0,1,1],[0,0,0]],[[1,0,0],[1,1,1],[0,0,0]],[[0,0,1],[1,1,1],[0,0,0]]];
+const LVS=[{c:[3],t:'Соберите <b style="color:#00f000">3 зелёных</b> квадрата'},{c:[3,4],t:'Соберите <b style="color:#00f000">3 зелёных</b> и <b style="color:#f00000">3 красных</b>'},{c:[4,0],t:'Соберите <b style="color:#f00000">3 красных</b> и <b style="color:#00f0f0">3 голубых</b>'},{c:[0,1],t:'Соберите <b style="color:#00f0f0">3 голубых</b> и <b style="color:#f0f000">3 жёлтых</b>'},{c:[1,2],t:'Соберите <b style="color:#f0f000">3 жёлтых</b> и <b style="color:#a000f0">3 фиолетовых</b>'}];
+const CS=[];for(let y=0;y<20;y++)for(let x=0;x<10;x++){const e=document.createElement('div');e.className='c';e.id=`c-${x}-${y}`;B.appendChild(e);CS.push({x,y,e})}
+function showL(){document.getElementById('lt').textContent=`Уровень ${LV}`;document.getElementById('lg').innerHTML=LVS[LV-1].t;document.getElementById('l').style.display='flex';A=false}
+document.getElementById('s2').onclick=()=>{document.getElementById('l').style.display='none';A=true;spawn()};
+function timer(){if(I)clearInterval(I);I=setInterval(mv,Math.max(80,1000/SP))}
+function spawn(){if(!A)return;let p;do{p=Math.floor(Math.random()*P.length)}while(p===PI&&P.length>1);PI=p;const ci=Math.floor(Math.random()*5);F={x:3,y:0,sh:P[p],col:C[ci],ci:ci};if(hit(F.x,F.y,F.sh)){end();return}draw();timer()}
+function hit(px,py,sh){for(let r=0;r<sh.length;r++)for(let c=0;c<sh[r].length;c++)if(sh[r][c]){const x=px+c,y=py+r;if(x<0||x>=10||y>=20||L.some(b=>b.x===x&&b.y===y))return true}return false}
+function draw(){CS.forEach(c=>{c.e.className='c';c.e.style.backgroundColor=''});L.forEach(b=>{const e=document.getElementById(`c-${b.x}-${b.y}`);if(e){e.className='c blk';e.style.backgroundColor=C[b.ci]}});if(F)for(let r=0;r<F.sh.length;r++)for(let c=0;c<F.sh[r].length;c++)if(F.sh[r][c]){const e=document.getElementById(`c-${F.x+c}-${F.y+r}`);if(e){e.className='c blk';e.style.backgroundColor=F.col}}}
+function mv(){if(!F||!A)return;if(!hit(F.x,F.y+1,F.sh)){F.y++;draw()}else lock()}
+function grav(){let m=false;for(let y=18;y>=0;y--)for(let x=0;x<10;x++){const i=L.findIndex(b=>b.x===x&&b.y===y);if(i!==-1&&!L.some(b=>b.x===x&&b.y===y+1)){L[i].y++;m=true}}return m}
+function chk3(){for(let y=0;y<=17;y++)for(let x=0;x<=7;x++){let fc=null,sq=true;for(let dy=0;dy<3;dy++){for(let dx=0;dx<3;dx++){const c=L.find(b=>b.x===x+dx&&b.y===y+dy);if(!c){sq=false;break}if(fc===null)fc=c.ci;else if(c.ci!==fc){sq=false;break}}if(!sq)break}if(sq){SQ[fc]++;document.getElementById(`n${fc}`).textContent=SQ[fc];if(SQ[fc]>=1)document.getElementById(`b${fc}`).classList.add('done');for(let dy=0;dy<3;dy++)for(let dx=0;dx<3;dx++)L=L.filter(b=>!(b.x===x+dx&&b.y===y+dy));SC+=500;return true}}return false}
+function chkL(){const r=LVS[LV-1].c;let done=true;for(let c of r)if(SQ[c]<3){done=false;break}if(done){if(LV<5){LV++;SC+=2000;SP+=.3;document.getElementById('lvl').textContent=LV;document.getElementById('score').textContent=SC;SQ=[0,0,0,0,0];for(let i=0;i<5;i++){document.getElementById(`n${i}`).textContent='0';document.getElementById(`b${i}`).classList.remove('done')}clearInterval(I);F=null;draw();showL()}else end(true)}}
+function lock(){if(!F)return;for(let r=0;r<F.sh.length;r++)for(let c=0;c<F.sh[r].length;c++)if(F.sh[r][c])L.push({x:F.x+c,y:F.y+r,ci:F.ci});F=null;clearInterval(I);let fl=[];for(let y=19;y>=0;y--)if(L.filter(b=>b.y===y).length===10)fl.push(y);if(fl.length>0){let lb=0;fl.forEach(y=>{const rb=L.filter(b=>b.y===y);const fc=rb[0].ci;if(rb.every(b=>b.ci===fc))lb+=100});L=L.filter(b=>!fl.includes(b.y));fl.sort((a,b)=>a-b).forEach(y=>{L=L.map(b=>b.y<y?{...b,y:b.y+1}:b)});SC+=fl.length*fl.length*100+lb;SP+=.1}let he=chk3();while(he){grav();he=chk3()}chkL();document.getElementById('score').textContent=SC;draw();setTimeout(()=>{if(A)spawn()},300)}
+function drop(){if(!F||!A)return;clearInterval(I);while(!hit(F.x,F.y+1,F.sh))F.y++;draw();lock()}
+function rot(){if(!F||!A)return;const sz=F.sh.length,ns=Array(sz).fill().map(()=>Array(sz).fill(0));for(let y=0;y<sz;y++)for(let x=0;x<sz;x++)ns[x][sz-1-y]=F.sh[y][x];if(!hit(F.x,F.y,ns)){F.sh=ns;draw()}}
+function end(w=false){A=false;F=null;clearInterval(I);draw();document.getElementById('fs').textContent=SC;document.getElementById('fl').textContent=w?'🏆 Вы прошли все 5 уровней!':`Достигнут уровень: ${LV}`;document.getElementById('g').querySelector('h2').textContent=w?'Победа!':'Игра окончена!';document.getElementById('g').style.display='flex'}
+function reset(){L=[];SC=0;SP=1;LV=1;SQ=[0,0,0,0,0];document.getElementById('score').textContent='0';document.getElementById('lvl').textContent='1';for(let i=0;i<5;i++){document.getElementById(`n${i}`).textContent='0';document.getElementById(`b${i}`).classList.remove('done')}document.getElementById('g').style.display='none';document.getElementById('r').style.display='none';showL()}
+document.getElementById('left').onclick=()=>{if(F&&A&&!hit(F.x-1,F.y,F.sh)){F.x--;draw()}};
+document.getElementById('right').onclick=()=>{if(F&&A&&!hit(F.x+1,F.y,F.sh)){F.x++;draw()}};
+document.getElementById('rot').onclick=rot;document.getElementById('drop').onclick=drop;
+document.getElementById('s1').onclick=()=>{document.getElementById('r').style.display='none';showL()};
+document.getElementById('s3').onclick=reset;
+}catch(e){alert("Ошибка: "+e.message)}
 </script>

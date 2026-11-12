@@ -1,0 +1,312 @@
+<style>
+  body { margin: 0; background: #111; color: white; font-family: 'Courier New', Courier, monospace; display: flex; flex-direction: column; align-items: center; overflow: hidden; height: 100vh; justify-content: center; }
+  
+  /* Экраны (Меню и Поражение) */
+  #menu, #game-over { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(17, 17, 17, 0.98); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; padding: 20px; text-align: center; }
+  #game-over { display: none; }
+  
+  .logo { font-size: 28px; font-weight: 900; letter-spacing: 2px; margin-bottom: 20px; color: #ff4444; text-shadow: 0 0 10px #ff0000; }
+  .rules { font-size: 14px; line-height: 1.6; max-width: 320px; text-align: left; background: #1e1e1e; padding: 15px; border-radius: 10px; border: 1px solid #333; }
+  .rules span { color: #00f0f0; font-weight: bold; }
+  .btn { margin-top: 25px; padding: 12px 30px; font-size: 18px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 0 #0056b3; }
+  .btn:active { transform: translateY(4px); box-shadow: none; }
+
+  /* HUD */
+  #hud { display: flex; gap: 15px; font-size: 18px; margin-bottom: 10px; font-weight: bold; align-items: center; }
+  #lives { color: #ff4444; }
+  #shield { color: #00f0f0; display: none; }
+  #crystal-hud { color: #a000f0; display: none; }
+  
+  /* Сцена */
+  #scene { perspective: 1000px; width: 400px; height: 400px; display: flex; align-items: center; justify-content: center; }
+  #board { display: grid; grid-template-columns: repeat(10, 28px); grid-template-rows: repeat(10, 28px); gap: 1px; transform: rotateX(60deg) rotateZ(-45deg); transform-style: preserve-3d; }
+  
+  /* Тайлы */
+  .tile { width: 28px; height: 28px; background: #1e1e1e; border: 1px solid #333; position: relative; transition: 0.1s; }
+  .wall { background: #444; box-shadow: 3px 3px 0 #222; z-index: 10; }
+  .player { background: #007bff; box-shadow: 3px 3px 0 #0056b3; z-index: 20; border-radius: 4px; }
+  .enemy { background: #ff4444; box-shadow: 3px 3px 0 #990000; z-index: 20; border-radius: 50%; }
+  .chest { background: #f0a000; box-shadow: 3px 3px 0 #b07000; z-index: 15; }
+  .crystal { z-index: 15; }
+  .crystal::after { content: ''; position: absolute; top: 6px; left: 6px; width: 16px; height: 16px; background: #a000f0; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 5px #a000f0; }
+  .portal-closed { background: #333; box-shadow: 3px 3px 0 #111; z-index: 15; }
+  .portal-open { background: #a000f0; box-shadow: 3px 3px 0 #600090; z-index: 25; animation: pulse 1s infinite; }
+  @keyframes pulse { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.7; } }
+
+  /* Управление */
+  .controls { margin-top: 20px; display: grid; grid-template-columns: repeat(3, 60px); gap: 5px; }
+  button.ctrl-btn { padding: 15px; font-size: 20px; background: #232e3c; color: white; border: 1px solid #444; border-radius: 8px; cursor: pointer; }
+  button.ctrl-btn:active { background: #007bff; }
+  .empty { visibility: hidden; }
+</style>
+
+<div id="menu">
+  <div class="logo">СПАСИТЕ ПРИНЦЕССУ</div>
+  <div class="rules">
+    <b>📜 ПРАВИЛА:</b><br><br>
+    😈 Вы в подземелье. Найдите <span>золотой сундук</span>, чтобы открыть <span>портал</span>.<br><br>
+    ❤️ У вас есть 3 жизни.<br><br>
+    💎 Со 2-го уровня собирайте <b>5 кристаллов</b> — они дают <b>Щит (5 ударов)</b>.
+  </div>
+  <button class="btn" id="start">В подземелье!</button>
+</div>
+
+<div id="game-over">
+  <div class="logo" style="color: #ff4444;">ВЫ ПОГИБЛИ</div>
+  <div class="rules" style="text-align: center;">
+    Монстры превзошли вас в сражении...<br><br>
+    Ваш результат: <b style="color: #00f0f0; font-size: 20px;">Уровень <span id="final-level">1</span></b>
+  </div>
+  <button class="btn" id="restart">Попробовать снова</button>
+</div>
+
+<div id="hud">
+  <div>Ур: <span id="level">1</span></div>
+  <div id="lives">❤️❤️❤️</div>
+  <div id="shield" style="display:none">🛡️ <span id="shield-val">0</span></div>
+  <div id="crystal-hud" style="display:none">💎 <span id="crystal-val">0</span>/5</div>
+</div>
+
+<div id="scene">
+  <div id="board"></div>
+</div>
+
+<div class="controls">
+  <button class="empty"></button>
+  <button class="ctrl-btn" id="up">↑</button>
+  <button class="empty"></button>
+  <button class="ctrl-btn" id="left">←</button>
+  <button class="ctrl-btn" id="down">↓</button>
+  <button class="ctrl-btn" id="right">→</button>
+</div>
+
+<script>
+  const BOARD_SIZE = 10;
+  let boardData = []; 
+  let playerPos = { x: 5, y: 5 };
+  let enemies = [];
+  let chestPos = { x: 0, y: 0 };
+  let portalPos = { x: 0, y: 0 };
+  let crystals = [];
+  
+  let portalOpen = false;
+  let lives = 3;
+  let shield = 0;
+  let level = 1;
+  let gameActive = false;
+
+  const boardEl = document.getElementById('board');
+  const livesEl = document.getElementById('lives');
+  const levelEl = document.getElementById('level');
+  const shieldEl = document.getElementById('shield');
+  const crystalHudEl = document.getElementById('crystal-hud');
+
+  function updateHUD() {
+    livesEl.textContent = '❤️'.repeat(lives) + '🖤'.repeat(Math.max(0, 3 - lives));
+    if (shield > 0) {
+      shieldEl.style.display = 'block';
+      document.getElementById('shield-val').textContent = shield;
+    } else {
+      shieldEl.style.display = 'none';
+    }
+    if (level >= 2) {
+      crystalHudEl.style.display = 'block';
+      document.getElementById('crystal-val').textContent = 5 - crystals.length;
+    } else {
+      crystalHudEl.style.display = 'none';
+    }
+  }
+
+  function isReachable(tx, ty) {
+    const q = [{x: playerPos.x, y: playerPos.y}];
+    const visited = new Set();
+    visited.add(`${playerPos.x},${playerPos.y}`);
+    
+    while(q.length > 0) {
+      const curr = q.shift();
+      if (curr.x === tx && curr.y === ty) return true;
+      
+      const dirs = [[0,1], [0,-1], [1,0], [-1,0]];
+      for (let d of dirs) {
+        const nx = curr.x + d[0], ny = curr.y + d[1];
+        if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && boardData[ny][nx] === 0 && !visited.has(`${nx},${ny}`)) {
+          visited.add(`${nx},${ny}`);
+          q.push({x: nx, y: ny});
+        }
+      }
+    }
+    return false;
+  }
+
+  function getSafeEmptyCell() {
+    let x, y, attempts = 0;
+    do {
+      x = Math.floor(Math.random() * (BOARD_SIZE - 2)) + 1;
+      y = Math.floor(Math.random() * (BOARD_SIZE - 2)) + 1;
+      attempts++;
+      if (attempts > 200) return {x: 1, y: 1};
+    } while (
+      boardData[y][x] === 1 || 
+      (x === playerPos.x && y === playerPos.y) || 
+      enemies.some(e => e.x === x && e.y === y) || 
+      (x === chestPos.x && y === chestPos.y) || 
+      (x === portalPos.x && y === portalPos.y) ||
+      crystals.some(c => c.x === x && c.y === y) ||
+      !isReachable(x, y)
+    );
+    return { x, y };
+  }
+
+  function initGame() {
+    boardData = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(0));
+    
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      boardData[0][i] = 1; boardData[BOARD_SIZE-1][i] = 1;
+      boardData[i][0] = 1; boardData[i][BOARD_SIZE-1] = 1;
+    }
+
+    for (let y = 4; y <= 6; y++) for (let x = 4; x <= 6; x++) boardData[y][x] = 0;
+
+    for (let i = 0; i < 15; i++) {
+      const wx = Math.floor(Math.random() * (BOARD_SIZE - 2)) + 1;
+      const wy = Math.floor(Math.random() * (BOARD_SIZE - 2)) + 1;
+      if (wx < 4 || wx > 6 || wy < 4 || wy > 6) boardData[wy][wx] = 1; 
+    }
+
+    playerPos = { x: 5, y: 5 };
+    enemies = [];
+    crystals = [];
+    chestPos = { x: -1, y: -1 };
+    portalPos = { x: -1, y: -1 };
+    
+    chestPos = getSafeEmptyCell();
+    portalPos = getSafeEmptyCell();
+
+    for (let i = 0; i < level; i++) {
+      const pos = getSafeEmptyCell();
+      enemies.push({ x: pos.x, y: pos.y });
+    }
+
+    if (level >= 2) {
+      for (let i = 0; i < 5; i++) {
+        const pos = getSafeEmptyCell();
+        crystals.push({ x: pos.x, y: pos.y });
+      }
+    }
+    
+    portalOpen = false;
+    levelEl.textContent = level;
+    updateHUD();
+    render();
+  }
+
+  function render() {
+    boardEl.innerHTML = '';
+    for (let y = 0; y < BOARD_SIZE; y++) {
+      for (let x = 0; x < BOARD_SIZE; x++) {
+        const tile = document.createElement('div');
+        tile.className = 'tile';
+        
+        if (boardData[y][x] === 1) tile.classList.add('wall');
+        else if (x === chestPos.x && y === chestPos.y) tile.classList.add('chest');
+        else if (x === portalPos.x && y === portalPos.y) {
+          tile.classList.add(portalOpen ? 'portal-open' : 'portal-closed');
+        }
+        else if (crystals.some(c => c.x === x && c.y === y)) tile.classList.add('crystal');
+        else if (enemies.some(e => e.x === x && e.y === y)) tile.classList.add('enemy');
+        
+        if (playerPos.x === x && playerPos.y === y) tile.classList.add('player');
+        
+        boardEl.appendChild(tile);
+      }
+    }
+  }
+
+  function movePlayer(dx, dy) {
+    if (!gameActive) return;
+    
+    const newX = playerPos.x + dx;
+    const newY = playerPos.y + dy;
+
+    if (boardData[newY][newX] === 1) return;
+
+    playerPos.x = newX;
+    playerPos.y = newY;
+
+    if (playerPos.x === chestPos.x && playerPos.y === chestPos.y) {
+      portalOpen = true;
+      chestPos = { x: -1, y: -1 };
+      // Убрали alert, чтобы не прерывать игру
+    }
+
+    const crystalIndex = crystals.findIndex(c => c.x === playerPos.x && c.y === playerPos.y);
+    if (crystalIndex !== -1) {
+      crystals.splice(crystalIndex, 1);
+      if (crystals.length === 0) {
+        shield = 5;
+      }
+      updateHUD();
+    }
+
+    if (playerPos.x === portalPos.x && playerPos.y === portalPos.y && portalOpen) {
+      level++;
+      initGame();
+      return;
+    }
+
+    render();
+    moveEnemies();
+  }
+
+  function moveEnemies() {
+    enemies.forEach(enemy => {
+      let dx = 0, dy = 0;
+      if (enemy.x < playerPos.x) dx = 1;
+      else if (enemy.x > playerPos.x) dx = -1;
+      if (enemy.y < playerPos.y) dy = 1;
+      else if (enemy.y > playerPos.y) dy = -1;
+
+      if (dx !== 0 && boardData[enemy.y][enemy.x + dx] === 0) enemy.x += dx;
+      else if (dy !== 0 && boardData[enemy.y + dy][enemy.x] === 0) enemy.y += dy;
+
+      if (enemy.x === playerPos.x && enemy.y === playerPos.y) {
+        if (shield > 0) {
+          shield--;
+          updateHUD();
+          enemy.x = 1; enemy.y = 1; // Отбрасываем
+        } else {
+          lives--;
+          updateHUD();
+          if (lives <= 0) {
+            gameActive = false;
+            document.getElementById('final-level').textContent = level;
+            document.getElementById('game-over').style.display = 'flex';
+          } else {
+            playerPos = getSafeEmptyCell();
+          }
+        }
+      }
+    });
+    render();
+  }
+
+  document.getElementById('up').onclick = () => movePlayer(0, -1);
+  document.getElementById('down').onclick = () => movePlayer(0, 1);
+  document.getElementById('left').onclick = () => movePlayer(-1, 0);
+  document.getElementById('right').onclick = () => movePlayer(1, 0);
+
+  document.getElementById('start').onclick = () => {
+    document.getElementById('menu').style.display = 'none';
+    gameActive = true;
+    // Сброс прогресса при новой игре
+    lives = 3; shield = 0; level = 1; 
+    initGame();
+  };
+
+  document.getElementById('restart').onclick = () => {
+    document.getElementById('game-over').style.display = 'none';
+    gameActive = true;
+    lives = 3; shield = 0; level = 1;
+    initGame();
+  };
+</script>

@@ -11,35 +11,27 @@ if (!process.env.BOT_TOKEN) {
 }
 
 const tg = Telegram.fromToken(process.env.BOT_TOKEN);
+
+// Загружаем HTML для ВСЕХ игр
 const tetrisHtml = fs.readFileSync(path.join('src', 'widgets', 'tetris.html'), 'utf8');
+const rogueHtml = fs.readFileSync(path.join('src', 'widgets', 'rogue.html'), 'utf8'); // <- Новая игра
 
 // --- СИСТЕМА ПОДСЧЕТА ИГРОКОВ ---
 const dataDir = path.join('data');
 const playersFile = path.join(dataDir, 'players.json');
 
-// Создаем папку data, если ее нет
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir);
-}
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
 
-// Читаем список игроков
 let players = new Set();
 if (fs.existsSync(playersFile)) {
-  try {
-    const data = JSON.parse(fs.readFileSync(playersFile, 'utf8'));
-    players = new Set(data);
-  } catch (e) {
-    console.error('Ошибка чтения файла игроков:', e);
-  }
+  try { players = new Set(JSON.parse(fs.readFileSync(playersFile, 'utf8'))); } catch (e) {}
 }
 
 function addPlayer(userId) {
   if (!players.has(userId)) {
     players.add(userId);
     fs.writeFileSync(playersFile, JSON.stringify(Array.from(players), null, 2));
-    return true; // Новый игрок
   }
-  return false;
 }
 // --------------------------------
 
@@ -47,17 +39,13 @@ tg.catch((error) => console.error('🔥 Ошибка:', error));
 
 tg.onMessage(async (message) => {
   if (message.text === '/start') {
-    await message.send('👋 Привет! Напиши /tetris, чтобы запустить игру.');
+    await message.send('👋 Привет! Доступные команды:\n/tetris — запустить Тетрис\n/rogue — запустить изометрический рогалик (прототип)');
   }
   
+  // --- ТЕТРИС ---
   if (message.text === '/tetris') {
     if (message.chat.type !== 'private') return message.send('Только в личных сообщениях.');
-    
-    // Добавляем игрока в базу
-    if (message.from && message.from.id) {
-      addPlayer(message.from.id);
-    }
-    
+    if (message.from && message.from.id) addPlayer(message.from.id);
     const totalPlayers = players.size;
 
     try {
@@ -65,22 +53,31 @@ tg.onMessage(async (message) => {
         chat_id: message.chat.id,
         html: tetrisHtml,
         allow_queries: true,
-        chat_data: JSON.stringify({ 
-          locked: [], 
-          score: 0,
-          totalPlayers: totalPlayers // Передаем счетчик игроков в виджет
-        }),
+        chat_data: JSON.stringify({ locked: [], score: 0, totalPlayers: totalPlayers }),
         caption: `Тетрис | 👥 Игроков: ${totalPlayers}`
       });
     } catch (error) {
-      console.error('🔥 Ошибка отправки виджета:', error);
+      console.error('🔥 Ошибка отправки Тетриса:', error);
+    }
+  }
+
+  // --- РОГАЛИК ---
+  if (message.text === '/rogue') {
+    if (message.chat.type !== 'private') return message.send('Только в личных сообщениях.');
+    
+    try {
+      await tg.api.sendWidget({
+        chat_id: message.chat.id,
+        html: rogueHtml,
+        allow_queries: true,
+        chat_data: JSON.stringify({ state: 'start' }),
+        caption: '⚔️ Изометрический рогалик (Прототип)'
+      });
+    } catch (error) {
+      console.error('🔥 Ошибка отправки Рогалика:', error);
     }
   }
 });
 
-tg.on('widget_query', async (query) => {
-  console.log('Запрос от виджета:', query.data);
-});
-
 tg.startPolling();
-console.log(`✅ Бот запущен! Всего игроков в базе: ${players.size}`);
+console.log(`✅ Бот запущен! Игроков в базе: ${players.size}`);
