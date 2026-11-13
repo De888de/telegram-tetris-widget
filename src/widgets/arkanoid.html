@@ -1,0 +1,323 @@
+<style>
+  body{margin:0;background:#0b0f19;color:#eef2ff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;overflow:hidden}
+  #menu, #level-overlay, #game-over{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(11,15,25,0.98);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;padding:20px;text-align:center}
+  #level-overlay, #game-over { display: none; }
+  .logo{font-size:32px;font-weight:900;letter-spacing:2px;margin-bottom:20px;color:#4a9bff;text-shadow:0 0 10px #4a9bff}
+  .rules{font-size:14px;line-height:1.6;max-width:320px;text-align:left;background:#1e1e1e;padding:15px;border-radius:10px;border:1px solid #333}
+  .rules span{color:#ffcc00;font-weight:bold}
+  .btn{margin-top:25px;padding:12px 30px;font-size:18px;background:#4a9bff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold;box-shadow:0 4px 0 #1a3a7a}
+  .btn:active{transform:translateY(4px);box-shadow:none}
+
+  #board{position:relative;width:300px;height:400px;background:#111;border:2px solid #333;overflow:hidden;margin-top:10px}
+  #paddle{position:absolute;bottom:10px;width:60px;height:10px;background:#4a9bff;border-radius:5px;left:120px;box-shadow:0 0 10px #4a9bff;transition:width 0.2s}
+  #ball{position:absolute;width:10px;height:10px;background:#fff;border-radius:50%;box-shadow:0 0 10px #fff}
+  #ball.armored{background:#a000f0;box-shadow:0 0 15px #a000f0}
+  .brick{position:absolute;width:28px;height:15px;border-radius:3px;border:1px solid rgba(255,255,255,0.2)}
+  .brick.armored{box-shadow:inset 0 0 5px #000; border:2px solid #888}
+  
+  #hud{display:flex;justify-content:space-between;width:300px;font-size:14px;font-weight:bold;margin-bottom:5px;color:#8b97b5}
+  
+  .controls{margin-top:15px;display:flex;gap:20px}
+  button.ctrl-btn{padding:15px 30px;font-size:24px;background:#232e3c;color:white;border:1px solid #444;border-radius:8px;cursor:pointer}
+  button.ctrl-btn:active{background:#4a9bff}
+
+  #game-over h2{color:#ff4444;margin-bottom:10px}
+  #level-overlay h2{color:#31e08a;margin-bottom:10px}
+</style>
+
+<div id="menu">
+  <div class="logo">АРКАНОИД</div>
+  <div class="rules">
+    <b>📜 ПРАВИЛА:</b><br><br>
+    🧱 Разбейте все блоки. <b>Серые</b> блоки требуют 2 удара.<br>
+    ❤️ У вас 3 жизни. При потере жизни <span>магия</span> останавливает игру.<br>
+    🎁 Из блоков выпадают бонусы:<br>
+    🔵 Увеличение платформы<br>
+    🟣 Бронированный шар<br><br>
+    🏆 Пройдите все <b>10 уровней!</b> Скорость растет.
+  </div>
+  <button class="btn" id="start">Вперёд!</button>
+</div>
+
+<div id="level-overlay">
+  <h2 id="level-title">Уровень 1</h2>
+  <p>Приготовьтесь!</p>
+  <button class="btn" id="next-level">Продолжить</button>
+</div>
+
+<div id="hud">
+  <div>Ур: <span id="lvl">1</span>/10</div>
+  <div>❤️ <span id="lives">3</span></div>
+  <div>Очки: <span id="score">0</span></div>
+</div>
+
+<div id="board">
+  <div id="paddle"></div>
+  <div id="ball"></div>
+</div>
+
+<div class="controls">
+  <button class="ctrl-btn" id="left">←</button>
+  <button class="ctrl-btn" id="right">→</button>
+</div>
+
+<div id="game-over">
+  <h2>Игра окончена!</h2>
+  <p>Вы дошли до <span id="final-level">1</span> уровня.</p>
+  <p>Ваш результат: <span id="final-score">0</span></p>
+  <button id="restart">Начать сначала</button>
+</div>
+
+<script>
+  const W = window.TelegramWidget;
+  const boardEl = document.getElementById('board');
+  const paddleEl = document.getElementById('paddle');
+  const ballEl = document.getElementById('ball');
+  
+  const WIDTH = 300;
+  const HEIGHT = 400;
+  const PADDLE_W = 60;
+  const BALL_SIZE = 10;
+  
+  let paddleX = (WIDTH - PADDLE_W) / 2;
+  let ballX, ballY, ballDX, ballDY;
+  
+  let score = 0;
+  let lives = 3;
+  let currentLevel = 1;
+  let bricks = [];
+  let powerups = [];
+  let gameLoop = null;
+  let gameActive = false;
+  let gameOver = false;
+  let isPaused = false;
+  
+  let paddleBoostUntil = 0;
+  let armoredBallUntil = 0;
+
+  // Функция создания блоков (сложность зависит от уровня)
+  function createBricks() {
+    bricks.forEach(b => b.el.remove());
+    bricks = [];
+    const colors = ['#ff4444', '#ffcc00', '#31e08a', '#4a9bff', '#a000f0'];
+    const rows = Math.min(3 + currentLevel, 7); // Больше рядов с уровнем
+    const armorChance = 0.1 + (currentLevel * 0.05); // Больше брони с уровнем
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < 9; col++) {
+        const el = document.createElement('div');
+        el.className = 'brick';
+        const isArmored = Math.random() < armorChance;
+        if (isArmored) el.classList.add('armored');
+        
+        el.style.background = colors[row % colors.length];
+        el.style.left = (col * 32) + 'px';
+        el.style.top = (row * 20 + 10) + 'px';
+        boardEl.appendChild(el);
+        
+        bricks.push({ x: col * 32, y: row * 20 + 10, w: 28, h: 15, el, alive: true, hp: isArmored ? 2 : 1 });
+      }
+    }
+  }
+
+  function spawnPowerup(x, y) {
+    const rand = Math.random();
+    let type = null;
+    if (rand < 0.5) type = 'paddle';
+    else if (rand < 0.8) type = 'armor';
+    if (!type) return;
+
+    const el = document.createElement('div');
+    el.style.cssText = `position:absolute;width:12px;height:12px;border-radius:50%;left:${x}px;top:${y}px;z-index:5;box-shadow:0 0 10px #fff;`;
+    if (type === 'paddle') el.style.background = '#4a9bff';
+    if (type === 'armor') el.style.background = '#a000f0';
+    
+    boardEl.appendChild(el);
+    powerups.push({ x, y, w: 12, h: 12, el, type, vy: 1.5 });
+  }
+
+  function update() {
+    if (!gameActive || gameOver || isPaused) return;
+
+    ballX += ballDX;
+    ballY += ballDY;
+
+    if (ballX <= 0 || ballX >= WIDTH - BALL_SIZE) ballDX *= -1;
+    if (ballY <= 0) ballDY *= -1;
+
+    const currentPaddleW = Date.now() < paddleBoostUntil ? PADDLE_W * 1.5 : PADDLE_W;
+    if (ballY >= HEIGHT - 25 && ballY <= HEIGHT - 15) {
+      if (ballX >= paddleX && ballX + BALL_SIZE <= paddleX + currentPaddleW) {
+        ballDY = -Math.abs(ballDY);
+      }
+    }
+
+    if (ballY >= HEIGHT) {
+      lives--;
+      document.getElementById('lives').textContent = lives;
+      
+      if (lives <= 0) {
+        return endGame(false);
+      } else {
+        isPaused = true;
+        boardEl.style.opacity = '0.3';
+        setTimeout(() => {
+          isPaused = false;
+          boardEl.style.opacity = '1';
+          ballX = WIDTH / 2;
+          ballY = HEIGHT - 30;
+          // Скорость зависит от уровня
+          const speed = 2 + (currentLevel * 0.3);
+          ballDX = speed;
+          ballDY = -speed;
+          paddleX = (WIDTH - currentPaddleW) / 2;
+          paddleEl.style.width = currentPaddleW + 'px';
+          paddleEl.style.left = paddleX + 'px';
+        }, 2000);
+        return;
+      }
+    }
+
+    bricks.forEach(b => {
+      if (!b.alive) return;
+      if (ballX + BALL_SIZE > b.x && ballX < b.x + b.w && ballY + BALL_SIZE > b.y && ballY < b.y + b.h) {
+        if (Date.now() >= armoredBallUntil) ballDY *= -1;
+
+        b.hp--;
+        if (b.hp <= 0) {
+          b.alive = false;
+          b.el.remove();
+          score += 10;
+          document.getElementById('score').textContent = score;
+          if (Math.random() < 0.15) spawnPowerup(b.x + 8, b.y);
+        } else {
+          b.el.style.opacity = '0.6';
+          b.el.style.border = '1px dashed #fff';
+        }
+      }
+    });
+
+    if (bricks.every(b => !b.alive)) {
+      return endGame(true);
+    }
+
+    powerups.forEach((p, index) => {
+      p.y += p.vy;
+      p.el.style.top = p.y + 'px';
+      
+      if (p.y + p.h >= HEIGHT - 20 && p.y < HEIGHT - 10) {
+        if (p.x >= paddleX && p.x <= paddleX + currentPaddleW) {
+          if (p.type === 'paddle') {
+            paddleBoostUntil = Date.now() + 10000;
+            paddleEl.style.width = (PADDLE_W * 1.5) + 'px';
+          } else if (p.type === 'armor') {
+            armoredBallUntil = Date.now() + 10000;
+            ballEl.classList.add('armored');
+            setTimeout(() => ballEl.classList.remove('armored'), 10000);
+          }
+          p.el.remove();
+          powerups.splice(index, 1);
+          return;
+        }
+      }
+      if (p.y > HEIGHT) {
+        p.el.remove();
+        powerups.splice(index, 1);
+      }
+    });
+
+    if (Date.now() > paddleBoostUntil) paddleEl.style.width = PADDLE_W + 'px';
+    if (Date.now() > armoredBallUntil) ballEl.classList.remove('armored');
+
+    ballEl.style.left = ballX + 'px';
+    ballEl.style.top = ballY + 'px';
+    paddleEl.style.left = paddleX + 'px';
+  }
+
+  function endGame(win = false) {
+    gameActive = false;
+    clearInterval(gameLoop);
+    
+    if (win) {
+      if (currentLevel < 10) {
+        // Переход на следующий уровень
+        currentLevel++;
+        document.getElementById('lvl').textContent = currentLevel;
+        document.getElementById('level-title').textContent = `Уровень ${currentLevel}!`;
+        document.getElementById('level-overlay').style.display = 'flex';
+      } else {
+        // Победа во всей игре
+        gameOver = true;
+        document.getElementById('final-level').textContent = '10 (Победа!)';
+        document.getElementById('final-score').textContent = score;
+        document.querySelector('#game-over h2').textContent = '🏆 Вы прошли все 10 уровней!';
+        document.getElementById('game-over').style.display = 'flex';
+      }
+    } else {
+      // Проигрыш
+      gameOver = true;
+      document.getElementById('final-level').textContent = currentLevel;
+      document.getElementById('final-score').textContent = score;
+      document.querySelector('#game-over h2').textContent = '💀 Игра окончена!';
+      document.getElementById('game-over').style.display = 'flex';
+    }
+  }
+
+  function startLevel() {
+    document.getElementById('level-overlay').style.display = 'none';
+    gameActive = true;
+    gameOver = false;
+    isPaused = false;
+    paddleX = (WIDTH - PADDLE_W) / 2;
+    ballX = WIDTH / 2;
+    ballY = HEIGHT - 30;
+    
+    // Скорость шара зависит от уровня
+    const speed = 2 + (currentLevel * 0.3);
+    ballDX = speed;
+    ballDY = -speed;
+    
+    powerups = [];
+    paddleBoostUntil = 0;
+    armoredBallUntil = 0;
+    boardEl.style.opacity = '1';
+    paddleEl.style.width = PADDLE_W + 'px';
+    ballEl.classList.remove('armored');
+    
+    document.getElementById('score').textContent = score;
+    document.getElementById('lives').textContent = lives;
+    createBricks();
+    clearInterval(gameLoop);
+    gameLoop = setInterval(update, 20);
+  }
+
+  function resetGame() {
+    document.getElementById('menu').style.display = 'none';
+    currentLevel = 1;
+    score = 0;
+    lives = 3;
+    document.getElementById('lvl').textContent = currentLevel;
+    document.getElementById('score').textContent = score;
+    document.getElementById('lives').textContent = lives;
+    document.getElementById('game-over').style.display = 'none';
+    startLevel();
+  }
+
+  document.getElementById('left').onclick = () => {
+    if (isPaused || !gameActive) return;
+    const w = Date.now() < paddleBoostUntil ? PADDLE_W * 1.5 : PADDLE_W;
+    if (paddleX > 0) paddleX -= 20;
+    paddleEl.style.left = paddleX + 'px';
+  };
+  
+  document.getElementById('right').onclick = () => {
+    if (isPaused || !gameActive) return;
+    const w = Date.now() < paddleBoostUntil ? PADDLE_W * 1.5 : PADDLE_W;
+    if (paddleX < WIDTH - w) paddleX += 20;
+    paddleEl.style.left = paddleX + 'px';
+  };
+
+  document.getElementById('start').onclick = resetGame;
+  document.getElementById('next-level').onclick = startLevel;
+  document.getElementById('restart').onclick = resetGame;
+</script>

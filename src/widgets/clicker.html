@@ -1,0 +1,108 @@
+<style>
+  body{margin:0;background:#0b0f19;color:#eef2ff;font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:15px;overflow:hidden}
+  #header{text-align:center;margin-bottom:15px;width:100%}
+  #balance{font-size:32px;font-weight:900;color:#4a9bff;text-shadow:0 0 10px rgba(74,155,255,0.5)}
+  #perSec{font-size:14px;color:#31e08a;font-weight:bold;margin-top:5px}
+  #tapBtn{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#4a9bff,#1a3a7a);border:4px solid #9cc8ff;cursor:pointer;font-size:60px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(74,155,255,0.5);margin:10px 0;transition:transform 0.1s;user-select:none}
+  #tapBtn:active{transform:scale(0.9)}
+  .shop{width:100%;max-width:320px;margin-top:10px;background:#141b2d;border-radius:15px;padding:10px;border:1px solid #2a3a5a;max-height:200px;overflow-y:auto}
+  .shop h3{margin:0 0 10px 0;font-size:14px;color:#8b97b5;text-align:center}
+  .item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #2a3a5a;font-size:13px}
+  .item:last-child{border:none}
+  .item button{background:#31e08a;color:#000;border:none;padding:5px 10px;border-radius:5px;font-weight:bold;cursor:pointer;font-size:11px}
+  .item button:disabled{background:#444;color:#888;cursor:not-allowed}
+  .item .price{color:#f5c451;font-weight:bold;font-size:11px}
+  #float{position:absolute;pointer-events:none;font-weight:900;color:#fff;animation:fly 1s ease-out forwards;text-shadow:0 0 10px #4a9bff}
+  @keyframes fly{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-80px) scale(1.5)}}
+</style>
+
+<div id="header">
+  <div id="balance">0 ⚡</div>
+  <div id="perSec">+0 ⚡/сек</div>
+</div>
+
+<button id="tapBtn">⚡</button>
+
+<div class="shop" id="shop">
+  <h3>🛒 МАГАЗИН</h3>
+  <div id="shopList"></div>
+</div>
+
+<script>
+  const W = window.TelegramWidget;
+  // Загружаем состояние от бота
+  let S = JSON.parse(W.chatData || '{"bal":0,"tap":1,"auto":0,"bought":0}');
+  
+  // Элементы
+  const balEl = document.getElementById('balance');
+  const perSecEl = document.getElementById('perSec');
+  const tapBtn = document.getElementById('tapBtn');
+  const shopList = document.getElementById('shopList');
+
+  // Функция обновления текста на экране
+  function updateUI() {
+    balEl.textContent = Math.floor(S.bal) + ' ⚡';
+    perSecEl.textContent = '+' + (S.auto * 0.5).toFixed(1) + ' ⚡/сек'; // Пассивный доход
+    renderShop();
+  }
+
+  // Отрисовка магазина
+  function renderShop() {
+    const cost = Math.floor(100 * Math.pow(1.5, S.bought));
+    shopList.innerHTML = `
+      <div class="item">
+        <div>
+          <div>🤖 Дроид-шахтер</div>
+          <div class="price">${cost} ⚡</div>
+        </div>
+        <button id="buyBtn" ${S.bal < cost ? 'disabled' : ''}>Купить</button>
+      </div>
+    `;
+    document.getElementById('buyBtn').onclick = () => {
+      if (S.bal >= cost) {
+        S.bal -= cost;
+        S.auto += 1;
+        S.bought += 1;
+        updateUI();
+        sendSave();
+      }
+    };
+  }
+
+  // Сохранение состояния на сервер (в бота)
+  function sendSave() {
+    W.request('save:' + JSON.stringify(S)).catch(e => console.log('Save error', e));
+  }
+
+  // Клик
+  tapBtn.onclick = (e) => {
+    S.bal += S.tap;
+    updateUI();
+
+    // Визуальный эффект
+    const f = document.createElement('div');
+    f.id = 'float';
+    f.textContent = '+' + S.tap;
+    const rect = tapBtn.getBoundingClientRect();
+    f.style.left = (e.clientX || rect.left + rect.width/2) + 'px';
+    f.style.top = (e.clientY || rect.top + rect.height/2) + 'px';
+    document.body.appendChild(f);
+    setTimeout(() => f.remove(), 1000);
+    
+    // Раз в 10 кликов отправляем сохранение, чтобы не спамить бота
+    if (Math.random() < 0.1) sendSave(); 
+  };
+
+  // Пассивный доход (каждую секунду)
+  setInterval(() => {
+    if (S.auto > 0) {
+      S.bal += S.auto * 0.5;
+      updateUI();
+    }
+  }, 1000);
+
+  // Сохраняем раз в 5 секунд на всякий случай
+  setInterval(sendSave, 5000);
+
+  updateUI();
+</script>

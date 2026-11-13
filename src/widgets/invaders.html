@@ -1,0 +1,190 @@
+<style>
+  body{margin:0;background:#000;color:#fff;font-family:'Courier New',monospace;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;overflow:hidden}
+  #menu{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;padding:20px;text-align:center}
+  .logo{font-size:28px;font-weight:900;letter-spacing:2px;margin-bottom:20px;color:#31e08a;text-shadow:0 0 10px #31e08a}
+  .rules{font-size:14px;line-height:1.6;max-width:320px;text-align:left;background:#111;padding:15px;border-radius:10px;border:1px solid #333}
+  .rules span{color:#ff4444;font-weight:bold}
+  .btn{margin-top:25px;padding:12px 30px;font-size:18px;background:#31e08a;color:#000;border:none;border-radius:8px;cursor:pointer;font-weight:bold;box-shadow:0 4px 0 #1a7a4a}
+  .btn:active{transform:translateY(4px);box-shadow:none}
+  #board{position:relative;width:300px;height:400px;background:#000;border:2px solid #333;overflow:hidden;margin-top:10px}
+  .player{position:absolute;bottom:10px;width:30px;height:15px;background:#31e08a;border-radius:3px;box-shadow:0 0 10px #31e08a}
+  .bullet{position:absolute;width:4px;height:10px;background:#ff4444;box-shadow:0 0 8px #ff4444}
+  .enemy{position:absolute;width:20px;height:20px;background:#a000f0;border-radius:4px;box-shadow:0 0 8px #a000f0}
+  .enemy-bullet{position:absolute;width:4px;height:8px;background:#ffcc00;box-shadow:0 0 6px #ffcc00}
+  #hud{display:flex;justify-content:space-between;width:300px;font-size:14px;font-weight:bold;margin-bottom:5px;color:#8b97b5}
+  .controls{margin-top:15px;display:flex;gap:10px}
+  button.ctrl-btn{padding:12px 20px;font-size:18px;background:#232e3c;color:white;border:1px solid #444;border-radius:8px;cursor:pointer}
+  button.ctrl-btn:active{background:#31e08a}
+  button.fire-btn{background:#ff4444;color:white;border:none;box-shadow:0 4px 0 #990000}
+  button.fire-btn:active{background:#ff6666;transform:translateY(2px);box-shadow:0 2px 0 #990000}
+  #game-over{display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);flex-direction:column;align-items:center;justify-content:center;z-index:10}
+  #game-over h2{color:#ff4444;margin-bottom:10px}
+  #game-over button{padding:10px 20px;font-size:16px;background:#007bff;border:none;border-radius:5px;color:white;cursor:pointer}
+</style>
+
+<div id="menu">
+  <div class="logo">SPACE INVADERS</div>
+  <div class="rules">
+    <b>📜 ПРАВИЛА:</b><br><br>
+    👾 Уничтожьте всех пришельцев.<br><br>
+    🕹 Управляйте пушкой кнопками ← и →.<br><br>
+    🔫 Нажимайте <span>Огонь</span>, чтобы стрелять.<br><br>
+    💀 Не дайте пришельцам дойти до низа!
+  </div>
+  <button class="btn" id="start">В бой!</button>
+</div>
+
+<div id="hud">
+  <div>Очки: <span id="score">0</span></div>
+  <div>Волна: <span id="wave">1</span></div>
+</div>
+
+<div id="board">
+  <div id="player" class="player"></div>
+</div>
+
+<div class="controls">
+  <button class="ctrl-btn" id="left">←</button>
+  <button class="ctrl-btn fire-btn" id="fire">🔥</button>
+  <button class="ctrl-btn" id="right">→</button>
+</div>
+
+<div id="game-over">
+  <h2>Игра окончена!</h2>
+  <p>Ваш результат: <span id="final-score">0</span></p>
+  <button id="restart">Попробовать снова</button>
+</div>
+
+<script>
+  const W = window.TelegramWidget;
+  const boardEl = document.getElementById('board');
+  const playerEl = document.getElementById('player');
+  const WIDTH = 300;
+  const HEIGHT = 400;
+  const PLAYER_W = 30;
+  
+  let playerX = (WIDTH - PLAYER_W) / 2;
+  let score = 0;
+  let wave = 1;
+  let bullets = [];
+  let enemies = [];
+  let enemyBullets = [];
+  let gameLoop = null;
+  let gameActive = false;
+  let gameOver = false;
+  let enemyDirection = 1;
+  let enemySpeed = 1;
+  let lastShootTime = 0;
+
+  function createEnemies() {
+    enemies.forEach(e => e.el.remove());
+    enemies = [];
+    const rows = 3, cols = 6, startX = 20, startY = 30, gapX = 40, gapY = 35;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const el = document.createElement('div');
+        el.className = 'enemy';
+        el.style.left = (startX + c * gapX) + 'px';
+        el.style.top = (startY + r * gapY) + 'px';
+        boardEl.appendChild(el);
+        enemies.push({ x: startX + c * gapX, y: startY + r * gapY, w: 20, h: 20, el, alive: true });
+      }
+    }
+    enemyDirection = 1;
+    enemySpeed = 1 + wave * 0.2;
+  }
+
+  function update() {
+    if (!gameActive || gameOver) return;
+
+    // Пули игрока
+    bullets.forEach((b, i) => {
+      b.y -= 5;
+      b.el.style.top = b.y + 'px';
+      if (b.y < -10) { b.el.remove(); bullets.splice(i, 1); return; }
+      enemies.forEach(e => {
+        if (!e.alive) return;
+        if (b.x + 4 > e.x && b.x < e.x + e.w && b.y < e.y + e.h && b.y + 10 > e.y) {
+          e.alive = false; e.el.remove(); b.el.remove();
+          score += 10; document.getElementById('score').textContent = score;
+          bullets.splice(bullets.indexOf(b), 1);
+        }
+      });
+    });
+
+    // Враги
+    let edgeReached = false;
+    let aliveEnemies = enemies.filter(e => e.alive);
+    if (aliveEnemies.length === 0) {
+      wave++; document.getElementById('wave').textContent = wave;
+      createEnemies(); return;
+    }
+    aliveEnemies.forEach(e => {
+      e.x += enemyDirection * enemySpeed;
+      e.el.style.left = e.x + 'px';
+      if (e.x <= 0 || e.x >= WIDTH - e.w) edgeReached = true;
+      if (Math.random() < 0.001) {
+        const bulletEl = document.createElement('div');
+        bulletEl.className = 'enemy-bullet';
+        bulletEl.style.left = (e.x + 8) + 'px';
+        bulletEl.style.top = (e.y + 20) + 'px';
+        boardEl.appendChild(bulletEl);
+        enemyBullets.push({ x: e.x + 8, y: e.y + 20, el: bulletEl });
+      }
+    });
+    if (edgeReached) {
+      enemyDirection *= -1;
+      aliveEnemies.forEach(e => { e.y += 15; e.el.style.top = e.y + 'px'; });
+    }
+
+    // Пули врагов
+    enemyBullets.forEach((b, i) => {
+      b.y += 3;
+      b.el.style.top = b.y + 'px';
+      if (b.y > HEIGHT) { b.el.remove(); enemyBullets.splice(i, 1); return; }
+      if (b.x > playerX && b.x < playerX + PLAYER_W && b.y > HEIGHT - 30) return endGame();
+    });
+
+    if (aliveEnemies.some(e => e.y > HEIGHT - 50)) return endGame();
+    playerEl.style.left = playerX + 'px';
+  }
+
+  function shoot() {
+    if (!gameActive || gameOver) return;
+    const now = Date.now();
+    if (now - lastShootTime < 300) return;
+    lastShootTime = now;
+    const bulletEl = document.createElement('div');
+    bulletEl.className = 'bullet';
+    bulletEl.style.left = (playerX + PLAYER_W / 2 - 2) + 'px';
+    bulletEl.style.top = (HEIGHT - 40) + 'px';
+    boardEl.appendChild(bulletEl);
+    bullets.push({ x: playerX + PLAYER_W / 2 - 2, y: HEIGHT - 40, el: bulletEl });
+  }
+
+  function endGame() {
+    gameOver = true; clearInterval(gameLoop);
+    document.getElementById('final-score').textContent = score;
+    document.getElementById('game-over').style.display = 'flex';
+  }
+
+  function startGame() {
+    document.getElementById('menu').style.display = 'none';
+    gameActive = true; gameOver = false;
+    playerX = (WIDTH - PLAYER_W) / 2;
+    score = 0; wave = 1;
+    bullets = []; enemyBullets = [];
+    document.getElementById('score').textContent = '0';
+    document.getElementById('wave').textContent = '1';
+    document.getElementById('game-over').style.display = 'none';
+    createEnemies();
+    clearInterval(gameLoop);
+    gameLoop = setInterval(update, 50); // Замедлили с 20 до 50 мс
+  }
+
+  document.getElementById('left').onclick = () => { if (playerX > 0) playerX -= 20; };
+  document.getElementById('right').onclick = () => { if (playerX < WIDTH - PLAYER_W) playerX += 20; };
+  document.getElementById('fire').onclick = shoot;
+  document.getElementById('start').onclick = startGame;
+  document.getElementById('restart').onclick = startGame;
+</script>
