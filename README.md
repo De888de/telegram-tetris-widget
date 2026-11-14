@@ -1,9 +1,6 @@
-cat > README.md << 'EOF'
-<div align="center">
-
 # 🕹️ TELEGRAM WIDGET GAMES 🕹️
 
-### *Коллекция полноценных игр прямо в сообщениях Telegram!*
+### *A collection of full-fledged games right inside Telegram messages!*
 
 [![Telegram](https://img.shields.io/badge/Telegram-@excellent__dad__bot-2CA5E0?style=for-the-badge&logo=telegram)](https://t.me/excellent_dad_bot)
 [![Bot API](https://img.shields.io/badge/Bot%20API-10.4-blue?style=for-the-badge)](https://core.telegram.org/bots/api-changelog#november-9-2026)
@@ -20,70 +17,70 @@ cat > README.md << 'EOF'
      ██║   ██╔══╝  ██║     ██╔══╝  ██║   ██║██╔══██╗██╔══██║██║╚██╔╝██║
      ██║   ███████╗███████╗███████╗╚██████╔╝██║  ██║██║  ██║██║ ╚═╝ ██║
      ╚═╝   ╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝
-👾 ЧТО ЭТО?
-Это коллекция игр, которые работают прямо внутри сообщения Telegram. Никаких скачиваний, установок и переходов по ссылкам. Нажал кнопку — и играешь.
+👾 WHAT IS THIS?
+This is a collection of games that run directly inside a Telegram message. No downloads, installations, or external links. Press a button and play.
 
-Доступные игры:
+Available games:
 
-🎮 Тетрис — классика с уровнями, цветами, квадратами 3x3 и системой ускорения.
+🎮 Tetris — classic with levels, colors, 3x3 squares, and speed-up mechanics.
 
-⚔️ Изометрический Рогалик — 3D-подземелье на CSS, спасение принцессы, монстры и кристаллы.
+⚔️ Isometric Roguelike — CSS-based 3D dungeon, rescue the princess, monsters, and crystals.
 
-🐍 Змейка — классика с волшебными и отравленными яблоками, меняющими скорость.
+🐍 Snake — classic with magic and poison apples that alter the speed.
 
-🧱 Арканоид — 10 уровней сложности, бронированные блоки и бонусы.
+🧱 Arkanoid — 10 difficulty levels, armored blocks, and power-ups.
 
-👾 Космические захватчики — (в разработке) 8-битная стрелялка.
+👾 Space Invaders — (in development) 8-bit shooter.
 
-(В будущем список будет пополняться!)
+(The list will grow in the future!)
 
-🚀 КАК ЗАПУСТИТЬ У СЕБЯ
-Требования
+🚀 HOW TO RUN LOCALLY
+Requirements
 Node.js 20+
 
-Токен от @BotFather
+Token from @BotFather
 
-Установка
+Installation
 bash
-# 1. Клонируй репозиторий
+# 1. Clone the repository
 git clone https://github.com/De888de/telegram-tetris-widget.git
 cd telegram-tetris-widget
 
-# 2. Установи зависимости
+# 2. Install dependencies
 npm install
 
-# 3. Создай .env и вставь токен
-echo "BOT_TOKEN=твой_токен_из_BotFather" > .env
+# 3. Create .env and paste your token
+echo "BOT_TOKEN=your_telegram_bot_token_here" > .env
 
-# 4. Запусти бота
+# 4. Start the bot
 npm run dev
-Использование
-/start — показать список всех команд.
+Usage
+/start — show the list of all commands.
 
-/tetris — запустить Тетрис.
+/tetris — launch Tetris.
 
-/rogue — запустить Рогалик.
+/rogue — launch Roguelike.
 
-/snake — запустить Змейку.
+/snake — launch Snake.
 
-/arkanoid — запустить Арканоид.
+/arkanoid — launch Arkanoid.
 
-(Все игры работают только в личных сообщениях с ботом).
+(All games work only in private messages with the bot).
 
-🛠️ ТЕХНОЛОГИИ
-Bot API 10.4 — новейшие HTML-виджеты (ноябрь 2026).
+🛠️ TECHNOLOGIES
+Bot API 10.4 — the latest HTML widgets (November 2026).
 
-puregram — быстрая и лёгкая обёртка над Telegram Bot API.
+puregram — fast and lightweight wrapper for the Telegram Bot API.
 
-HTML/CSS/JS — рендеринг игр внутри сообщения.
+HTML/CSS/JS — rendering games inside a message.
 
-Node.js — обработка запросов и хранение статистики игроков.
+Node.js — handling requests and storing player statistics.
 
-🤝 КОНТРИБЬЮТИНГ
-Нашёл баг или есть идея для новой игры? Открывай Issue или делай Pull Request.
+🤝 CONTRIBUTING
+Found a bug or have an idea for a new game? Open an Issue or make a Pull Request.
 
 <div align="center">
-⭐ Поставь звезду, если игры тебе понравились! ⭐
+⭐ Star the repo if you like the games! ⭐
 text
    __        __         _
    \ \      / /__  _ __| | _____ _ __
